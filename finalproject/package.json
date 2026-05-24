@@ -6,14 +6,14 @@
     "dev": "node server.js",
     "start": "node server.js",
     "client:dev": "npm --prefix frontend run dev",
-    "client:build": "npm --prefix frontend run build",
-    "build": "prisma generate && npm run client:build",
-    "render-build": "prisma migrate deploy && prisma generate",
+    "client:build": "cd frontend && npm run build",
+    "build": "prisma generate && cd frontend && npm ci && npm run build",
+    "render-build": "prisma migrate deploy && prisma generate && cd frontend && npm ci && npm run build",
     "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "dotenv": "^16.4.5",
@@ -21,7 +21,7 @@
     "install": "^0.13.0",
     "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^6.9.14",
+    "nodemailer": "^8.0.7",
     "razorpay": "^2.9.2"
   },
   "devDependencies": {

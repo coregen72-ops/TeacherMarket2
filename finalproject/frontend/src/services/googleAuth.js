@@ -1,5 +1,8 @@
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
+let googleInitializedClientId = '';
+let googleCredentialCallback = null;
+
 export function loadGoogleIdentity() {
   return new Promise((resolve, reject) => {
     if (window.google?.accounts?.id) {
@@ -37,22 +40,28 @@ export async function renderGoogleButton(container, callback) {
   if (!container) return;
 
   const google = await loadGoogleIdentity();
+  googleCredentialCallback = callback;
   container.innerHTML = '';
   const buttonWidth = Math.min(
     400,
     Math.max(300, Math.floor(container.getBoundingClientRect().width || container.offsetWidth || 400)),
   );
-  google.accounts.id.initialize({
-    client_id: GOOGLE_CLIENT_ID,
-    callback,
-    ux_mode: 'popup',
-    auto_select: false,
-    cancel_on_tap_outside: true,
-    // Disable FedCM which can block the button in some browser configs
-    use_fedcm_for_prompt: false,
-    use_fedcm_for_button: false,
-    button_auto_select: false,
-  });
+
+  if (googleInitializedClientId !== GOOGLE_CLIENT_ID) {
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: (response) => googleCredentialCallback?.(response),
+      ux_mode: 'popup',
+      auto_select: false,
+      cancel_on_tap_outside: true,
+      // Disable FedCM which can block the button in some browser configs
+      use_fedcm_for_prompt: false,
+      use_fedcm_for_button: false,
+      button_auto_select: false,
+    });
+    googleInitializedClientId = GOOGLE_CLIENT_ID;
+  }
+
   google.accounts.id.renderButton(container, {
     type: 'standard',
     theme: 'outline',
