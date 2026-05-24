@@ -8,8 +8,7 @@
     "client:dev": "npm --prefix frontend run dev",
     "client:build": "cd frontend && npm run build",
     "build": "npm run client:build",
-    "render-build": "prisma migrate deploy && prisma generate && cd frontend && npm ci && npm run build",
-    
+    "render-build": "prisma migrate deploy && prisma generate && cd frontend && npm ci && npm run build"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
