@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Sidebar from '../components/Sidebar';
@@ -6,230 +6,162 @@ import { paymentApi } from '../services/api';
 import './StudentDashboard.css';
 
 const NAV = [
-  { type:'section', label:'MAIN' },
-  { icon:'📊', label:'Dashboard',       path:'/teacher/dashboard' },
-  { icon:'🔍', label:'Browse Leads',    path:'/teacher/leads'     },
-  { icon:'🔓', label:'Unlocked Leads',  path:'/teacher/unlocked'  },
-  { icon:'👤', label:'My Profile',      path:'/teacher/profile'   },
-  { icon:'🪙', label:'Buy Coins',       path:'/teacher/coins'     },
-  { icon:'📋', label:'Coin History',    path:'/teacher/history'   },
+  { type:'section', label:'Main' },
+  { icon:'📊', label:'Overview',          path:'/teacher/dashboard'  },
+  { icon:'🔍', label:'Browse Students',   path:'/teacher/students'   },
+  { icon:'🔓', label:'Unlocked Profiles', path:'/teacher/unlocked'   },
+  { icon:'👤', label:'My Profile',        path:'/teacher/profile'    },
+  { icon:'🪙', label:'Buy Coins',         path:'/teacher/coins'      },
+  { icon:'📋', label:'Coin History',      path:'/teacher/history'    },
   { type:'divider' },
-  { type:'section', label:'SETTINGS' },
-  { icon:'⚙️', label:'Settings',        path:'/teacher/settings'  },
+  { type:'section', label:'Settings' },
+  { icon:'⚙️', label:'Settings',          path:'/teacher/settings'   },
   { icon:'🚪', label:'Log Out', logout:true },
 ];
 
-export default function BuyCoins() {
-  const { user, coins, updateCoins, refreshUser, toast } = useApp();
-  const navigate = useNavigate();
+const PACKAGES = [
+  { id:'starter', emoji:'🪙', name:'Starter Pack', coins:100, unlocks:2, price:100 },
+  { id:'standard', emoji:'💰', name:'Standard Pack', coins:200, unlocks:4, price:200 },
+  { id:'popular', emoji:'💎', name:'Popular Pack',  coins:250, unlocks:5, price:250, popular:true },
+];
 
-  const [packages,    setPackages]    = useState([]);
-  const [selected,    setSelected]    = useState('');
-  const [customAmt,   setCustomAmt]   = useState('');
-  const [processing,  setProcessing]  = useState(false);
-  const [devCrediting, setDevCred]    = useState(false);
+export default function BuyCoins() {
+  const { user, coins, updateCoins, toast } = useApp();
+  const navigate = useNavigate();
+  const [selected,   setSelected]   = useState('popular');
+  const [payMethod,  setPayMethod]  = useState('upi');
+  const [customAmt,  setCustomAmt]  = useState('');
+  const [processing, setProcessing] = useState(false);
 
   const name = user?.teacher?.name || user?.email || 'Teacher';
+  const pkg  = PACKAGES.find(p => p.id === selected) || PACKAGES[1];
+  const finalCoins = customAmt >= 100 ? parseInt(customAmt) : pkg.coins;
+  const finalPrice = customAmt >= 100 ? parseInt(customAmt) : pkg.price;
 
-  useEffect(() => {
-    const mapped = [
-      { key:'starter',  name:'Starter Pack',  emoji:'🪙', coins:250,  priceINR:250,  popular:false },
-      { key:'standard', name:'Standard Pack', emoji:'💰', coins:500,  priceINR:500,  popular:false },
-      { key:'popular',  name:'Popular Pack',  emoji:'💎', coins:1000, priceINR:1000, popular:true  },
-    ];
-    setPackages(mapped);
-    setSelected('popular');
-  }, []);
 
-  const pkg = packages.find(p => p.key === selected);
-  const customNum = parseInt(customAmt) || 0;
-  const isCustom = customNum >= 100;
-  const finalCoins = isCustom ? customNum : (pkg?.coins || 0);
-  const finalPrice = isCustom ? customNum : (pkg?.priceINR || 0);
-
-  // Dev mode: instantly credit coins without Razorpay
-  const handleDevCredit = async () => {
-    if (!finalCoins) { toast('Select a package first', 'e'); return; }
-    setDevCred(true);
-    try {
-      const order = await paymentApi.createOrder(
-        isCustom ? { customAmount: customNum } : { packageId: selected }
-      );
-      const result = await paymentApi.verifyPayment({
-        paymentId: order.paymentId,
-        razorpayPaymentId: 'dev_' + Date.now(),
-        amount: order.amount / 100,
-      });
-      updateCoins(result.coinBalance);
-      refreshUser();
-      toast(`🎉 ${result.message}`, 's');
-      setTimeout(() => navigate('/teacher/dashboard'), 1200);
-    } catch (err) { toast(err.message, 'e'); }
-    finally { setDevCred(false); }
-  };
-
-  const handleRazorpay = async () => {
-    if (!finalCoins) { toast('Select a package first', 'e'); return; }
+  const handlePay = async () => {
     setProcessing(true);
     try {
-      const order = await paymentApi.createOrder(
-        isCustom ? { customAmount: customNum } : { packageId: selected }
+      const orderData = await paymentApi.createOrder(
+        customAmt >= 100 ? { customAmount: parseInt(customAmt) } : { packageId: selected }
       );
+      const razorpayKey = orderData.keyId;
 
-      if (!order.keyId) {
-        // No Razorpay key — use dev credit
-        toast('Razorpay not configured. Using dev mode.', 'i');
-        const result = await paymentApi.verifyPayment({
-          paymentId: order.paymentId,
-          razorpayPaymentId: 'dev_' + Date.now(),
-          amount: order.amount / 100,
+      if (!razorpayKey) {
+        toast('Razorpay not configured — coins credited in test mode ✅', 'i');
+        const verify = await paymentApi.verifyPayment({
+          orderId: orderData.orderId,
+          paymentId: `dev_${Date.now()}`,
+          amount: orderData.amount / 100,
         });
-        updateCoins(result.coinBalance);
-        refreshUser();
-        toast(`🎉 ${result.message}`, 's');
-        setTimeout(() => navigate('/teacher/dashboard'), 1200);
+        updateCoins(verify.coinBalance);
+        navigate('/teacher/dashboard');
         return;
       }
 
-      // Load Razorpay script
-      if (!window.Razorpay) {
-        await new Promise((res, rej) => {
-          const s = document.createElement('script');
-          s.src = 'https://checkout.razorpay.com/v1/checkout.js';
-          s.onload = res; s.onerror = rej;
-          document.head.appendChild(s);
-        });
-      }
-
-      new window.Razorpay({
-        key:         order.keyId,
-        amount:      order.amount,
-        currency:    'INR',
+      const options = {
+        key:         razorpayKey,
+        amount:      orderData.amount,
+        currency:    orderData.currency,
         name:        'TeacherMarket',
-        description: order.packageName,
+        description: orderData.packageName,
+        prefill:     { name: orderData.userName, contact: orderData.userPhone },
+        theme:       { color: '#f5a623' },
         handler: async (response) => {
           try {
-            const result = await paymentApi.verifyPayment({
-              paymentId: order.paymentId,
+            const verify = await paymentApi.verifyPayment({
+              razorpayOrderId:   response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature,
-              amount: order.amount / 100,
+              amount: orderData.amount / 100,
             });
-            updateCoins(result.coinBalance);
-            refreshUser();
-            toast(`🎉 ${result.message}`, 's');
+            updateCoins(verify.coinBalance);
+            toast(`✅ ${verify.coinsAdded} coins added to your account!`, 's');
             navigate('/teacher/dashboard');
-          } catch (err) { toast('Verification failed: ' + err.message, 'e'); }
+          } catch (err) { toast('Payment verification failed: ' + err.message, 'e'); }
         },
-        prefill: { name: order.userName, contact: order.userPhone },
-        theme: { color: '#f5a623' },
-        modal: { ondismiss: () => { setProcessing(false); } },
-      }).open();
-    } catch (err) { toast(err.message, 'e'); setProcessing(false); }
+        modal: { ondismiss: () => { toast('Payment cancelled', 'w'); setProcessing(false); } },
+      };
+      if (orderData.orderId && !String(orderData.orderId).startsWith('local_order_')) {
+        options.order_id = orderData.orderId;
+      }
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      toast(err.message, 'e');
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  const noRazorpay = !import.meta.env.VITE_RAZORPAY_KEY_ID;
-
   return (
-    <div className="page-enter dash-layout">
-      <Sidebar nav={NAV} user={user} />
+    <div className="page-enter" style={{ paddingTop:66 }}>
+      {/* Load Razorpay script */}
+      {!window.Razorpay && (() => {
+        const s = document.createElement('script'); s.src = 'https://checkout.razorpay.com/v1/checkout.js'; document.head.appendChild(s); return null;
+      })()}
+
+      <Sidebar items={NAV} userName={name} userRole="Teacher Account" avClass="av-gold" initials={name[0]} />
       <main className="dash-main">
-        <div className="dash-inner" style={{ maxWidth:820 }}>
-          {/* Header */}
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
-            <div>
-              <h1 className="page-title">Buy Coins 🪙</h1>
-              <p className="page-sub">50 coins = 1 student profile unlock · First 2 unlocks always free</p>
+        <h1 className="page-title">Buy Coins</h1>
+        <p className="page-sub">Select a package · Each student profile unlock = 50 coins</p>
+
+        <div className="coins-layout">
+          <div>
+            <div className="big-coin-display">
+              <div className="bcd-label">Current Balance</div>
+              <div className="bcd-amount">{coins}</div>
+              <div className="bcd-sub">You can unlock {Math.floor(coins/50)} more student profiles</div>
             </div>
-            <div className="nav-coin-pill" style={{ fontSize:16, padding:'8px 18px' }}>🪙 {coins}</div>
-          </div>
 
-          {/* Dev mode banner */}
-          {noRazorpay && (
-            <div style={{ background:'#fef3c7', border:'1px solid #fcd34d', borderRadius:12, padding:'12px 18px', marginBottom:20, display:'flex', gap:12, alignItems:'center' }}>
-              <span style={{ fontSize:20 }}>⚡</span>
-              <div>
-                <div style={{ fontWeight:700, color:'#92400e', fontSize:14 }}>Dev Mode — Razorpay not configured</div>
-                <div style={{ fontSize:13, color:'#b45309' }}>Coins will be credited instantly. Set VITE_RAZORPAY_KEY_ID in .env for real payments.</div>
-              </div>
+            <div style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:16, color:'var(--navy)', marginBottom:14 }}>Choose Package</div>
+            <div className="pkg-grid">
+              {PACKAGES.map(p => (
+                <div key={p.id} className={`pkg-card ${p.popular?'popular':''} ${selected===p.id?'selected':''}`} onClick={() => { setSelected(p.id); setCustomAmt(''); }}>
+                  <div className="pkg-emoji">{p.emoji}</div>
+                  <div className="pkg-coins">{p.coins} <span>coins</span></div>
+                  <div style={{ fontSize:11, color:'var(--gray-l)', margin:'5px 0 10px' }}>Unlock {p.unlocks} profiles</div>
+                  <div className="pkg-price">₹{p.price}</div>
+                </div>
+              ))}
             </div>
-          )}
 
-          {/* Package cards */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:16, marginBottom:24 }}>
-            {packages.map(p => (
-              <div
-                key={p.key}
-                onClick={() => { setSelected(p.key); setCustomAmt(''); }}
-                style={{
-                  background: selected===p.key ? 'var(--gold-p)' : '#fff',
-                  border: selected===p.key ? '2px solid var(--gold)' : '2px solid var(--border)',
-                  borderRadius:14, padding:20, cursor:'pointer', textAlign:'center',
-                  position:'relative', transition:'all .2s',
-                  boxShadow: selected===p.key ? '0 4px 20px rgba(245,166,35,.2)' : 'none',
-                }}
-              >
-                {p.popular && (
-                  <div style={{ position:'absolute', top:-11, left:'50%', transform:'translateX(-50%)', background:'var(--gold)', color:'var(--navy)', fontSize:10, fontWeight:800, padding:'2px 12px', borderRadius:20, whiteSpace:'nowrap' }}>
-                    MOST POPULAR
-                  </div>
-                )}
-                <div style={{ fontSize:36, marginBottom:8 }}>{p.emoji}</div>
-                <div style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:15, color:'var(--navy)', marginBottom:4 }}>{p.name}</div>
-                <div style={{ fontSize:30, fontWeight:900, color:'var(--gold)', marginBottom:2 }}>🪙 {p.coins}</div>
-                <div style={{ fontSize:12, color:'var(--gray)', marginBottom:12 }}>= {Math.floor(p.coins/50)} student unlock{Math.floor(p.coins/50)!==1?'s':''}</div>
-                <div style={{ fontFamily:'Sora,sans-serif', fontWeight:900, fontSize:22, color:'var(--navy)' }}>₹{p.priceINR}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Custom amount */}
-          <div className="card" style={{ marginBottom:20 }}>
-            <div className="card-body">
-              <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:'var(--navy)', marginBottom:12 }}>Custom Amount</div>
-              <div style={{ display:'flex', gap:12, alignItems:'center' }}>
-                <span style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:20, color:'var(--navy)' }}>₹</span>
-                <input
-                  className="form-input"
-                  type="number"
-                  min={100}
-                  placeholder="Min ₹100 — you get equal coins"
-                  style={{ maxWidth:260, margin:0 }}
-                  value={customAmt}
-                  onChange={e => { setCustomAmt(e.target.value); if(parseInt(e.target.value)>=100) setSelected(''); }}
-                />
-                {customNum >= 100 && <span style={{ color:'var(--gold)', fontWeight:700 }}>= 🪙 {customNum} coins</span>}
-              </div>
-            </div>
-          </div>
-
-          {/* Order summary */}
-          <div className="card" style={{ marginBottom:20, background:'var(--gold-p)', border:'1px solid rgba(245,166,35,.3)' }}>
-            <div className="card-body" style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-              <div>
-                <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:13, color:'var(--navy)', marginBottom:4 }}>Order Summary</div>
-                <div style={{ fontSize:13, color:'var(--gray)' }}>
-                  {isCustom ? `Custom · ₹${finalPrice}` : (pkg?.name || '—')} · 🪙 {finalCoins} coins
+            <div className="card card-p" style={{ marginTop:20 }}>
+              <div style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:15, color:'var(--navy)', marginBottom:10 }}>Custom Amount</div>
+              <p style={{ fontSize:13, color:'var(--gray)', marginBottom:14 }}>Minimum ₹100 · 1 coin = ₹1</p>
+              <div style={{ display:'flex', gap:12 }}>
+                <input className="form-input" type="number" placeholder="Enter amount in ₹" style={{ flex:1 }} value={customAmt} onChange={e => { setCustomAmt(e.target.value); setSelected(''); }}/>
+                <div style={{ padding:'12px 18px', background:'var(--gold-p)', border:'2px solid rgba(245,166,35,.3)', borderRadius:12, fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:14, whiteSpace:'nowrap', color:'var(--navy)' }}>
+                  = {customAmt || 0} coins
                 </div>
               </div>
-              <div style={{ fontFamily:'Sora,sans-serif', fontWeight:900, fontSize:30, color:'var(--gold)' }}>₹{finalPrice}</div>
             </div>
           </div>
 
-          {/* Pay button */}
-          <button
-            className="btn btn-lg btn-primary btn-w-full"
-            onClick={noRazorpay ? handleDevCredit : handleRazorpay}
-            disabled={processing || devCrediting || (!pkg && !isCustom)}
-            style={{ marginBottom:10 }}
-          >
-            {(processing || devCrediting) ? 'Processing...' :
-              noRazorpay ? `⚡ Credit ${finalCoins} Coins Instantly (Dev Mode)` :
-              `Pay ₹${finalPrice} & Get ${finalCoins} Coins`}
-          </button>
-          <p style={{ textAlign:'center', fontSize:12, color:'var(--gray)' }}>
-            {noRazorpay ? 'Configure VITE_RAZORPAY_KEY_ID in .env for live payments' : 'Secured by Razorpay · 50 coins = 1 student unlock'}
-          </p>
+          <div>
+            <div className="order-card">
+              <div style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:16, color:'var(--navy)', marginBottom:18 }}>Order Summary</div>
+              <div style={{ background:'var(--off)', borderRadius:12, padding:16, marginBottom:18 }}>
+                <div className="order-row"><span style={{ color:'var(--gray)' }}>Package</span><span style={{ fontWeight:700 }}>{customAmt >= 100 ? 'Custom' : pkg.name}</span></div>
+                <div className="order-row"><span style={{ color:'var(--gray)' }}>Coins</span><span style={{ fontWeight:800, color:'var(--gold)' }}>+ {finalCoins} coins</span></div>
+                <div className="order-row" style={{ border:'none' }}><span style={{ fontWeight:800 }}>Total</span><span className="order-total">₹{finalPrice}</span></div>
+              </div>
+              <div style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:14, color:'var(--navy)', marginBottom:12 }}>Payment Method</div>
+              <div className="pay-method">
+                {[{ id:'upi', icon:'📱', label:'UPI / PhonePe / GPay' }, { id:'card', icon:'💳', label:'Credit / Debit Card' }, { id:'nb', icon:'🏦', label:'Net Banking' }].map(m => (
+                  <label key={m.id} className={`pay-opt ${payMethod===m.id?'selected':''}`} onClick={() => setPayMethod(m.id)}>
+                    <input type="radio" name="pay" checked={payMethod===m.id} readOnly style={{ accentColor:'var(--gold)' }}/>
+                    <span style={{ fontSize:18 }}>{m.icon}</span>
+                    <span style={{ fontWeight:600, fontSize:13 }}>{m.label}</span>
+                  </label>
+                ))}
+              </div>
+              <button className="btn btn-lg btn-primary btn-w-full" onClick={handlePay} disabled={processing || finalPrice < 100}>
+                {processing ? 'Processing…' : `Pay ₹${finalPrice} & Get Coins →`}
+              </button>
+              <p style={{ textAlign:'center', fontSize:11, color:'var(--gray-l)', marginTop:10 }}>🔒 Secured by Razorpay · Coins credited instantly</p>
+            </div>
+          </div>
         </div>
       </main>
     </div>

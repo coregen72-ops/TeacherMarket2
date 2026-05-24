@@ -63,24 +63,7 @@
   max-width: 100% !important;
   border-radius: 10px !important;
 }
-.auth-admin-mobile-btn {
-  display: none;
-  width: 100%;
-  margin: -10px 0 22px;
-  padding: 11px 16px;
-  border: 1.5px solid rgba(26,45,90,.18);
-  border-radius: 12px;
-  background: #fff;
-  color: var(--navy);
-  font-family: 'Sora', sans-serif;
-  font-weight: 800;
-  font-size: 13px;
-  cursor: pointer;
-}
 @media (max-width:768px) {
   .auth-layout { grid-template-columns:1fr; }
   .auth-left   { display:none; }
-  .auth-right  { align-items:flex-start; padding:96px 18px 34px; }
-  .auth-admin-mobile-btn { display: block; }
-  .auth-form-wrap { max-width: 100%; }
 }

@@ -12,15 +12,8 @@ export function loadGoogleIdentity() {
 
     const existing = document.querySelector('script[data-google-identity]');
     if (existing) {
-      // Script already in DOM but may still be loading
-      const poll = setInterval(() => {
-        if (window.google?.accounts?.id) {
-          clearInterval(poll);
-          resolve(window.google);
-        }
-      }, 100);
-      existing.addEventListener('error', () => { clearInterval(poll); reject(new Error('Google script failed to load')); }, { once: true });
-      setTimeout(() => { clearInterval(poll); if (window.google?.accounts?.id) resolve(window.google); else reject(new Error('Google script timeout')); }, 10000);
+      existing.addEventListener('load', () => resolve(window.google), { once: true });
+      existing.addEventListener('error', reject, { once: true });
       return;
     }
 
@@ -54,7 +47,6 @@ export async function renderGoogleButton(container, callback) {
       ux_mode: 'popup',
       auto_select: false,
       cancel_on_tap_outside: true,
-      // Disable FedCM which can block the button in some browser configs
       use_fedcm_for_prompt: false,
       use_fedcm_for_button: false,
       button_auto_select: false,

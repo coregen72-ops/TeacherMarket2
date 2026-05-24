@@ -1,22 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import Sidebar from '../components/Sidebar';
 import { profileApi } from '../services/api';
 
 const NAV = [
-  { type:'section', label:'MAIN' },
-  { icon:'📊', label:'Dashboard',        path:'/student/dashboard' },
-  { icon:'➕', label:'Post Requirement',  path:'/student/post'      },
-  { icon:'📋', label:'My Requirements',  path:'/student/leads'     },
-  { icon:'👤', label:'My Profile',       path:'/student/profile'   },
+  { type:'section', label:'Main' },
+  { icon:'📊', label:'Overview',      path:'/student/dashboard' },
+  { icon:'👤', label:'My Profile',    path:'/student/profile'   },
+  { icon:'🔍', label:'Find Teachers', path:'/student/teachers'  },
   { type:'divider' },
-  { type:'section', label:'SETTINGS' },
-  { icon:'⚙️', label:'Settings',         path:'/student/settings'  },
+  { type:'section', label:'Settings' },
+  { icon:'⚙️', label:'Settings',      path:'/student/settings'  },
   { icon:'🚪', label:'Log Out', logout:true },
 ];
 
 export default function StudentProfile() {
-  const { user, updateUser, refreshUser, toast } = useApp();
+  const { user, updateUser, toast } = useApp();
   const [saving, setSaving] = useState(false);
   const s = user?.student || {};
   const name = s.name || user?.email || 'Student';
@@ -24,17 +23,45 @@ export default function StudentProfile() {
   const [form, setForm] = useState({
     name: s.name || '', class: s.class || '', board: s.board || 'CBSE',
     city: s.city || '', area: s.area || '', address: s.address || '',
-    pincode: s.pincode || '', subjects: Array.isArray(s.subjects) ? s.subjects.join(', ') : (s.subjects || ''),
+    pincode: s.pincode || '', subjects: s.subjects || '',
     timing: s.timing || 'Evening', guardianName: s.guardianName || '',
     guardianPhone: s.guardianPhone || '', notes: s.notes || '',
   });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!s.name && !loading) {
+      setLoading(true);
+      profileApi.getStudent()
+        .then(data => {
+          setForm({
+            name: data.name || '',
+            class: data.class || '',
+            board: data.board || 'CBSE',
+            city: data.city || '',
+            area: data.area || '',
+            address: data.address || '',
+            pincode: data.pincode || '',
+            subjects: Array.isArray(data.subjects) ? data.subjects.join(', ') : (data.subjects || ''),
+            timing: data.timing || 'Evening',
+            guardianName: data.guardianName || '',
+            guardianPhone: data.guardianPhone || '',
+            notes: data.notes || '',
+          });
+          updateUser({ student: data });
+        })
+        .catch(err => console.error('Failed to load profile:', err.message))
+        .finally(() => setLoading(false));
+    }
+  }, [s.name, loading, updateUser]);
+
   const fset = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const save = async () => {
     setSaving(true);
     try {
-      const data = await profileApi.update({ studentDetails: { name: form.name, ...form }, currentUser: user });
-      updateUser(data.user); refreshUser();
+      const data = await profileApi.update({ name: form.name, studentDetails: form });
+      updateUser(data.user);
       toast('Profile saved ✅', 's');
     } catch (err) { toast(err.message, 'e'); }
     finally { setSaving(false); }
@@ -42,7 +69,7 @@ export default function StudentProfile() {
 
   return (
     <div className="page-enter" style={{ paddingTop:66 }}>
-      <Sidebar nav={NAV} user={user} />
+      <Sidebar items={NAV} userName={name} userRole="Student Account" avClass="av-navy" initials={name[0]} />
       <main className="dash-main">
         <h1 className="page-title">My Profile</h1>
         <p className="page-sub">Manage your student profile — teachers see this information</p>
@@ -65,7 +92,7 @@ export default function StudentProfile() {
                 {s.subjects && <div style={{ marginTop:14 }}>
                   <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-l)', textTransform:'uppercase', letterSpacing:'.8px', marginBottom:8 }}>Subjects</div>
                   <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                    {(Array.isArray(s.subjects) ? s.subjects : (s.subjects||'').split(',')).map(sub => <span key={sub} className="subject-pill">{sub.trim()}</span>)}
+                    {s.subjects.split(',').map(sub => <span key={sub} className="subject-pill">{sub.trim()}</span>)}
                   </div>
                 </div>}
               </div>

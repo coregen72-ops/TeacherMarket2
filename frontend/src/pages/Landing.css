@@ -170,15 +170,6 @@
 .footer-links li   { margin-bottom:9px; }
 .footer-links a    { color:rgba(255,255,255,.45);text-decoration:none;font-size:13px;transition:.18s; }
 .footer-links a:hover { color:#fff; }
-.footer-links button {
-  border: 0;
-  background: transparent;
-  color: rgba(255,255,255,.45);
-  font: inherit;
-  font-size: 13px;
-  padding: 0;
-  cursor: default;
-}
 .footer-bottom { display:flex;align-items:center;justify-content:space-between;padding-top:24px;border-top:1px solid rgba(255,255,255,.07); }
 .footer-copy   { font-size:12px;color:rgba(255,255,255,.35); }
 
@@ -193,63 +184,4 @@
   .price-cards   { grid-template-columns: 1fr; }
   .footer-top    { grid-template-columns: 1fr 1fr; }
   .footer        { padding: 40px 24px 24px; }
-}
-
-/* ── MOBILE RESPONSIVE (added fixes) ── */
-@media (max-width: 768px) {
-  .hero { padding: 90px 20px 60px; min-height: auto; }
-  .hero-inner { grid-template-columns: 1fr; gap: 32px; text-align: center; }
-  .hero-eyebrow { font-size: 11px; padding: 5px 14px; }
-  .hero-h1 { font-size: clamp(30px, 8vw, 42px); letter-spacing: -1px; }
-  .hero-p  { font-size: 15px; margin: 0 auto 28px; max-width: 100%; }
-  .hero-btns {
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 32px;
-  }
-  .hero-btns .btn { width: 100%; max-width: 320px; justify-content: center; }
-  .hero-stats { gap: 16px; justify-content: center; padding-top: 20px; flex-wrap: wrap; }
-  .hs-num { font-size: 22px; }
-  .hero-cards { display: none; }
-
-  .section { padding: 50px 20px; }
-  .sec-h2  { font-size: clamp(22px, 6vw, 32px); }
-  .sec-p   { font-size: 14px; }
-
-  .how-grid    { grid-template-columns: 1fr; gap: 16px; }
-  .how-card    { padding: 24px 20px; }
-
-  .price-cards { grid-template-columns: 1fr; gap: 14px; max-width: 360px; margin: 0 auto; }
-  .price-card  { padding: 22px 20px; }
-
-  .testi-grid  { grid-template-columns: 1fr; gap: 14px; }
-  .tcard       { padding: 20px; }
-
-  .cta-section { padding: 60px 20px; }
-  .cta-h2 { font-size: clamp(24px, 7vw, 38px); }
-  .cta-p  { font-size: 15px; margin-bottom: 28px; }
-  .cta-btns { flex-direction: column; align-items: center; gap: 10px; }
-  .cta-btns .btn { width: 100%; max-width: 320px; justify-content: center; }
-
-  .footer { padding: 36px 20px 24px; }
-  .footer-top {
-    grid-template-columns: 1fr 1fr;
-    gap: 28px 20px;
-  }
-  .footer-brand-p { max-width: 100%; }
-}
-
-@media (max-width: 480px) {
-  .hero { padding: 84px 16px 48px; }
-  .hero-h1 { font-size: clamp(26px, 9vw, 36px); }
-  .hero-stats { gap: 12px; }
-  .hs-num { font-size: 20px; }
-
-  .section { padding: 40px 16px; }
-
-  .how-grid, .testi-grid, .price-cards { padding: 0; }
-
-  .footer { padding: 30px 16px 20px; }
-  .footer-top { grid-template-columns: 1fr; gap: 20px; }
 }
