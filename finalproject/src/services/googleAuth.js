@@ -48,7 +48,7 @@ export async function renderGoogleButton(container, callback) {
       auto_select: false,
       cancel_on_tap_outside: true,
       use_fedcm_for_prompt: false,
-      use_fedcm_for_button: true,
+      use_fedcm_for_button: false,
       button_auto_select: false,
     });
     googleInitializedClientId = GOOGLE_CLIENT_ID;
