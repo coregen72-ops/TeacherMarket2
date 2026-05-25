@@ -316,8 +316,8 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-});
-// Non-blocking verify — won't prevent server from starting
+  family: 4,   // 👈 force IPv4
+});// Non-blocking verify — won't prevent server from starting
 transporter.verify((error) => {
   if (error) {
     console.error("❌ Email transporter error:", error.message);
