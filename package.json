@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "node server.cjs",
-    "build": "cd frontend && npm install && npm run build && cd .. && ./node_modules/.bin/prisma generate"
-  },
+    "build": "cd frontend && npm install && npm run build && cd .. && node node_modules/prisma/bin/prisma.js generate"  },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "bcrypt": "^5.1.0",
