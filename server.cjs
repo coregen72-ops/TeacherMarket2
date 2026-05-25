@@ -4,6 +4,7 @@ const express    = require("express");
 const cors       = require("cors");
 const Redis      = require("ioredis");
 const bcrypt     = require("bcrypt");
+const nodemailer = require("nodemailer");
 const jwt        = require("jsonwebtoken");
 const Razorpay   = require("razorpay");
 const crypto     = require("crypto");
@@ -212,34 +213,29 @@ const cleanStudent = (student, isUnlocked) => {
     address: "🔒 Locked", contactNumber: "🔒 Locked", isUnlocked: false };
 };
 
-// ─── Email via Resend API ─────────────────────────────────────────────────────
+// ─── Email via Gmail (nodemailer) ─────────────────────────────────────────────
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
 const sendOtpEmail = async (email, otp, subject) => {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from:    "TeacherMarket <onboarding@resend.dev>",
-      to:      [email],
-      subject,
-      html: `
-        <div style="font-family:sans-serif;max-width:420px;margin:auto;padding:32px;border:1px solid #e5e7eb;border-radius:12px;">
-          <h2 style="margin:0 0 8px;color:#111">${subject}</h2>
-          <p style="color:#555;margin:0 0 24px;font-size:14px;">Use the code below. It expires in 5 minutes.</p>
-          <div style="background:#f4f5f7;border-radius:8px;padding:20px;text-align:center;letter-spacing:12px;font-size:36px;font-weight:700;color:#111;">${otp}</div>
-          <p style="color:#999;font-size:12px;margin-top:24px;">Do not share this code with anyone.</p>
-        </div>
-      `,
-    }),
+  await transporter.sendMail({
+    from:    `"TeacherMarket" <${process.env.EMAIL_USER}>`,
+    to:      email,
+    subject,
+    html: `
+      <div style="font-family:sans-serif;max-width:420px;margin:auto;padding:32px;border:1px solid #e5e7eb;border-radius:12px;">
+        <h2 style="margin:0 0 8px;color:#111">${subject}</h2>
+        <p style="color:#555;margin:0 0 24px;font-size:14px;">Use the code below. It expires in 5 minutes.</p>
+        <div style="background:#f4f5f7;border-radius:8px;padding:20px;text-align:center;letter-spacing:12px;font-size:36px;font-weight:700;color:#111;">${otp}</div>
+        <p style="color:#999;font-size:12px;margin-top:24px;">Do not share this code with anyone.</p>
+      </div>
+    `,
   });
-  if (!response.ok) {
-    const err = await response.text();
-    console.error("Resend error:", err);
-    throw new Error(err);
-  }
-  return response.json();
 };
 
 // ─── FAQs ─────────────────────────────────────────────────────────────────────
