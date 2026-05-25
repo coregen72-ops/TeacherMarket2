@@ -310,16 +310,15 @@ const cleanStudent = (student, isUnlocked) => {
 };
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",   // 👈 explicit host, NOT service: "gmail"
-  port: 465,
-  secure: true,             // true for port 465
-  family: 4,                // ✅ NOW this actually works
+  host: "smtp.gmail.com",
+  port: 587,        // 👈 try 587 instead of 465
+  secure: false,    // STARTTLS (nodemailer upgrades automatically)
+  family: 4,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
 });
-
 // Non-blocking verify 
 transporter.verify((error) => {
   if (error) {
