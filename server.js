@@ -309,38 +309,46 @@ const cleanStudent = (student, isUnlocked) => {
   };
 };
 
-// ─── Email transporter ────────────────────────────────────────────────────────
+// ─── Email transporter (Gmail SMTP) ──────────────────────────────────────────
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    pass: process.env.EMAIL_PASS,   // must be Gmail App Password, not real password
   },
-  family: 4,   // 👈 force IPv4
-});// Non-blocking verify — won't prevent server from starting
+  family: 4,                        // force IPv4 — fixes ENETUNREACH on most servers
+});
+
+// Non-blocking verify — won't prevent server from starting
 transporter.verify((error) => {
   if (error) {
     console.error("❌ Email transporter error:", error.message);
   } else {
-    console.log("✅ Email transporter ready");
+    console.log("✅ Email transporter ready — Gmail SMTP connected");
   }
 });
 
 // ─── Send OTP Email helper ────────────────────────────────────────────────────
 const sendOtpEmail = async (email, otp, subject) => {
-  await transporter.sendMail({
-    from: `"Home Tutor Platform" <${process.env.EMAIL_USER}>`,
-    to:   email,
-    subject,
-    html: `
-      <div style="font-family:sans-serif;max-width:420px;margin:auto;padding:32px;border:1px solid #e5e7eb;border-radius:12px;">
-        <h2 style="margin:0 0 8px;color:#111">${subject}</h2>
-        <p style="color:#555;margin:0 0 24px;font-size:14px;">Use the code below. It expires in 5 minutes.</p>
-        <div style="background:#f4f5f7;border-radius:8px;padding:20px;text-align:center;letter-spacing:12px;font-size:36px;font-weight:700;color:#111;">${otp}</div>
-        <p style="color:#999;font-size:12px;margin-top:24px;">Do not share this code with anyone.</p>
-      </div>
-    `,
-  });
+  try {
+    const info = await transporter.sendMail({
+      from:    `"TeacherMarket" <${process.env.EMAIL_USER}>`,
+      to:      email,
+      subject,
+      html: `
+        <div style="font-family:sans-serif;max-width:420px;margin:auto;padding:32px;border:1px solid #e5e7eb;border-radius:12px;">
+          <h2 style="margin:0 0 8px;color:#111">${subject}</h2>
+          <p style="color:#555;margin:0 0 24px;font-size:14px;">Use the code below. It expires in 5 minutes.</p>
+          <div style="background:#f4f5f7;border-radius:8px;padding:20px;text-align:center;letter-spacing:12px;font-size:36px;font-weight:700;color:#111;">${otp}</div>
+          <p style="color:#999;font-size:12px;margin-top:24px;">Do not share this code with anyone.</p>
+        </div>
+      `,
+    });
+    console.log(`✅ OTP email sent to ${email} — Message ID: ${info.messageId}`);
+  } catch (err) {
+    console.error(`❌ Failed to send OTP email to ${email}:`, err.message);
+    throw err;  // re-throw so the caller can handle it
+  }
 };
 
 const DEFAULT_FAQS = [
@@ -446,7 +454,7 @@ app.post("/auth/send-otp", async (req, res) => {
     );
 
     // Send email in background (non-blocking)
-    sendOtpEmail(email, otp, "Your OTP Code — Home Tutor").catch((err) => {
+    sendOtpEmail(email, otp, "Your OTP Code — TeacherMarket").catch((err) => {
       console.error("Email sending failed:", err.message);
     });
 
@@ -570,7 +578,6 @@ app.post("/auth/register", async (req, res) => {
     }
 
     const cleaned   = phone ? phone.replace(/^\+?91/, "").trim() : "";
-    // For Google users, phone is optional — use a unique placeholder if not provided
     const fullPhone = cleaned
       ? `+91${cleaned}`
       : googleId
@@ -583,7 +590,6 @@ app.post("/auth/register", async (req, res) => {
     });
 
     if (existingEmailUser) {
-      // If registering via Google and the user already exists — just log them in
       if (googleId) {
         const token = jwt.sign(
           { userId: existingEmailUser.id, role: existingEmailUser.role, email: existingEmailUser.email },
@@ -600,7 +606,6 @@ app.post("/auth/register", async (req, res) => {
       });
     }
 
-    // Only check phone uniqueness if a real phone was provided
     if (cleaned) {
       const existingPhoneUser = await prisma.user.findUnique({
         where: { phone: `+91${cleaned}` },
@@ -691,10 +696,8 @@ app.post("/auth/register", async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  AUTH — LOGIN Step 1: Send OTP
+//  AUTH — GOOGLE
 // ══════════════════════════════════════════════════════════════════════════════
-// Google sign-in checks whether the email already has an account. Existing
-// users receive an app JWT; new users continue into the registration form.
 app.post("/auth/google", async (req, res) => {
   try {
     const profile = decodeGoogleCredential(req.body.credential);
@@ -748,6 +751,9 @@ app.post("/auth/google", async (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  AUTH — LOGIN Step 1: Send OTP
+// ══════════════════════════════════════════════════════════════════════════════
 app.post("/auth/login", async (req, res) => {
   try {
     const email = normalizeEmail(req.body.email);
@@ -776,7 +782,10 @@ app.post("/auth/login", async (req, res) => {
       "EX", OTP_TTL
     );
 
-    await sendOtpEmail(email, otp, "Login OTP — Home Tutor");
+    sendOtpEmail(email, otp, "Login OTP — TeacherMarket").catch((err) => {
+      console.error("Email sending failed:", err.message);
+    });
+
     res.json({ message: "OTP sent to your email ✅" });
   } catch (err) {
     console.error("Login error:", err.message);
@@ -2113,6 +2122,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`\n🚀 Server running on http://0.0.0.0:${PORT}`);
   console.log(`🖥️  Frontend served from: ${frontendPath}`);
   console.log(`🔑 Razorpay configured: ${!!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET)}`);
+  console.log(`📧 Email user: ${process.env.EMAIL_USER || "⚠️  EMAIL_USER not set"}`);
   console.log(`📋 Routes ready:`);
   console.log(`   POST /auth/send-otp`);
   console.log(`   POST /auth/verify-otp`);
