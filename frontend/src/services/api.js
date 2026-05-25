@@ -408,3 +408,24 @@ export const paymentApi = {
     };
   },
 };
+
+export const adminApi = {
+  async getStats() {
+    return http("GET", "/admin/stats", null, true);
+  },
+  async getUsers() {
+    return http("GET", "/admin/users", null, true);
+  },
+  async getTeachers() {
+    return http("GET", "/admin/teachers", null, true);
+  },
+  async getStudents() {
+    return http("GET", "/admin/students", null, true);
+  },
+  async getPayments() {
+    return http("GET", "/admin/payments", null, true);
+  },
+  async deleteUser(id) {
+    return http("DELETE", `/admin/users/${id}`, null, true);
+  },
+};
