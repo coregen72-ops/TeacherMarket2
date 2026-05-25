@@ -1,9 +1,9 @@
 {
   "name": "teachermarket-backend",
+  "version": "1.0.0",
   "scripts": {
-  "start": "node server.cjs",
-  "build": "cd frontend && npm install && npm run build && cd .. && ./node_modules/.bin/prisma generate"
-}
+    "start": "node server.cjs",
+    "build": "cd frontend && npm install && npm run build && cd .. && ./node_modules/.bin/prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
