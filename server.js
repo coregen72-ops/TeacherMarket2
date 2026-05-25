@@ -309,17 +309,18 @@ const cleanStudent = (student, isUnlocked) => {
   };
 };
 
-// ─── Email transporter (Gmail SMTP) ──────────────────────────────────────────
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",   // 👈 explicit host, NOT service: "gmail"
+  port: 465,
+  secure: true,             // true for port 465
+  family: 4,                // ✅ NOW this actually works
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,   // must be Gmail App Password, not real password
+    pass: process.env.EMAIL_PASS,
   },
-  family: 4,                        // force IPv4 — fixes ENETUNREACH on most servers
 });
 
-// Non-blocking verify — won't prevent server from starting
+// Non-blocking verify 
 transporter.verify((error) => {
   if (error) {
     console.error("❌ Email transporter error:", error.message);
@@ -327,7 +328,6 @@ transporter.verify((error) => {
     console.log("✅ Email transporter ready — Gmail SMTP connected");
   }
 });
-
 // ─── Send OTP Email helper ────────────────────────────────────────────────────
 const sendOtpEmail = async (email, otp, subject) => {
   try {
