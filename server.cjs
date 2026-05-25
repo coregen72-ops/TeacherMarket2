@@ -224,7 +224,7 @@ const transporter = nodemailer.createTransport({
 
 const sendOtpEmail = async (email, otp, subject) => {
   await transporter.sendMail({
-    from:    `"TeacherMarket" <${process.env.EMAIL_USER}>`,
+    from: "TeacherMarket <noreply@teachermarket.in>",
     to:      email,
     subject,
     html: `
