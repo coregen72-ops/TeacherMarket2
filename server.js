@@ -320,7 +320,7 @@ const transporter = {
       },
       body: JSON.stringify({
         from: 'TeacherMarket <onboarding@resend.dev>',
-        to: options.to,
+        to: [options.to],
         subject: options.subject,
         html: options.html,
       }),
