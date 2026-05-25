@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "node server.cjs",
-    "build": "cd frontend && npm install && npm run build && cd .. && node node_modules/.bin/prisma/build/index.js generate""
+    "build": "cd frontend && npm install && npm run build && cd .. && node node_modules/prisma/build/index.js generate"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
