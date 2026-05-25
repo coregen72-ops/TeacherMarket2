@@ -3,7 +3,7 @@ require("dotenv").config({ override: true });
 const express    = require("express");
 const cors       = require("cors");
 const Redis      = require("ioredis");
-const bcrypt     = require("bcrypt");
+const bcrypt     = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const jwt        = require("jsonwebtoken");
 const Razorpay   = require("razorpay");
