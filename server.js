@@ -309,24 +309,19 @@ const cleanStudent = (student, isUnlocked) => {
   };
 };
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,        // 👈 try 587 instead of 465
-  secure: false,    // STARTTLS (nodemailer upgrades automatically)
-  family: 4,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-// Non-blocking verify 
-transporter.verify((error) => {
-  if (error) {
-    console.error("❌ Email transporter error:", error.message);
-  } else {
-    console.log("✅ Email transporter ready — Gmail SMTP connected");
-  }
-});
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// ─── Send OTP Email helper ────────────────────────────────────
+export const sendOTPEmail = async (toEmail, otp) => {
+  await resend.emails.send({
+    from: "onboarding@resend.dev",   // works without custom domain
+    to: toEmail,
+    subject: "Your OTP Code",
+    html: `<p>Your OTP is <strong>${otp}</strong>. Valid for 10 minutes.</p>`,
+  });
+};
 // ─── Send OTP Email helper ────────────────────────────────────────────────────
 const sendOtpEmail = async (email, otp, subject) => {
   try {
