@@ -4,7 +4,8 @@ const express    = require("express");
 const cors       = require("cors");
 const Redis      = require("ioredis");
 const bcrypt     = require("bcryptjs");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
+const resend = new Resend(process.env.RESEND_API_KEY);
 const jwt        = require("jsonwebtoken");
 const Razorpay   = require("razorpay");
 const crypto     = require("crypto");
@@ -214,18 +215,10 @@ const cleanStudent = (student, isUnlocked) => {
 };
 
 // ─── Email via Gmail (nodemailer) ─────────────────────────────────────────────
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
 const sendOtpEmail = async (email, otp, subject) => {
-  await transporter.sendMail({
+  await resend.emails.send({
     from: "TeacherMarket <noreply@teachermarket.in>",
-    to:      email,
+    to: email,
     subject,
     html: `
       <div style="font-family:sans-serif;max-width:420px;margin:auto;padding:32px;border:1px solid #e5e7eb;border-radius:12px;">
@@ -236,9 +229,7 @@ const sendOtpEmail = async (email, otp, subject) => {
       </div>
     `,
   });
-};
-
-// ─── FAQs ─────────────────────────────────────────────────────────────────────
+};// ─── FAQs ─────────────────────────────────────────────────────────────────────
 const DEFAULT_FAQS = [
   { question: "How does TeacherMarket work?", answer: "Students post their requirements for free. Admin reviews each inquiry, then published leads become available for teachers to unlock with coins.", order: 1 },
   { question: "Is it free for students?", answer: "Yes. Students can post education-related requirements for free.", order: 2 },
