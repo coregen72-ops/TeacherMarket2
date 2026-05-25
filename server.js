@@ -310,15 +310,26 @@ const cleanStudent = (student, isUnlocked) => {
 };
 
 // ─── Email transporter ────────────────────────────────────────────────────────
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+const transporter = {
+  sendMail: async (options) => {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'TeacherMarket <onboarding@resend.dev>',
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
   },
-});
+  verify: (cb) => cb(null),
+};
 // Non-blocking verify — won't prevent server from starting
 transporter.verify((error) => {
   if (error) {
