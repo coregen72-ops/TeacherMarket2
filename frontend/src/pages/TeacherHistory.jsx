@@ -1,20 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import Sidebar from '../components/Sidebar';
-import { paymentApi } from '../services/api';
+import { paymentApi, leadsApi } from '../services/api';
+import { PageSkeleton } from '../components/Skeleton';
 import './StudentDashboard.css';
 
 const NAV = [
-  { type:'section', label:'Main' },
-  { icon:'📊', label:'Overview',          path:'/teacher/dashboard' },
-  { icon:'🔍', label:'Browse Students',   path:'/teacher/students'  },
-  { icon:'🔓', label:'Unlocked Profiles', path:'/teacher/unlocked'  },
-  { icon:'👤', label:'My Profile',        path:'/teacher/profile'   },
-  { icon:'🪙', label:'Buy Coins',         path:'/teacher/coins'     },
-  { icon:'📋', label:'Coin History',      path:'/teacher/history'   },
+  { type:'section', label:'MAIN' },
+  { icon:'📊', label:'Dashboard',       path:'/teacher/dashboard' },
+  { icon:'🔍', label:'Browse Leads',    path:'/teacher/leads'     },
+  { icon:'🔓', label:'Unlocked Leads',  path:'/teacher/unlocked'  },
+  { icon:'👤', label:'My Profile',      path:'/teacher/profile'   },
+  { icon:'🪙', label:'Buy Coins',       path:'/teacher/coins'     },
+  { icon:'📋', label:'Coin History',    path:'/teacher/history'   },
   { type:'divider' },
-  { type:'section', label:'Settings' },
-  { icon:'⚙️', label:'Settings',          path:'/teacher/settings'  },
+  { type:'section', label:'SETTINGS' },
+  { icon:'⚙️', label:'Settings',        path:'/teacher/settings'  },
   { icon:'🚪', label:'Log Out', logout:true },
 ];
 
@@ -39,9 +40,10 @@ export default function TeacherHistory() {
   ].sort((a, b) => b.date - a.date);
 
   return (
-    <div className="page-enter" style={{ paddingTop:66 }}>
-      <Sidebar items={NAV} userName={name} userRole="Teacher Account" avClass="av-gold" initials={name[0]} />
+    <div className="page-enter dash-layout">
+      <Sidebar nav={NAV} user={user} />
       <main className="dash-main">
+        <div className="dash-inner" style={{ maxWidth:1000 }}>
         <h1 className="page-title">Coin History</h1>
         <p className="page-sub">All coin purchases and profile unlocks</p>
 
@@ -51,7 +53,7 @@ export default function TeacherHistory() {
           <div className="stat-c c-navy"><div style={{fontSize:22}}>🔓</div><div className="stat-num">{unlocks.length}</div><div className="stat-label">Total Unlocks</div></div>
         </div>
 
-        {loading && <div style={{textAlign:'center',padding:48,color:'var(--gray-l)'}}>Loading…</div>}
+        {loading && <PageSkeleton variant="list" />}
         <div className="card">
           <div className="tbl-wrap">
             <table>
@@ -67,7 +69,7 @@ export default function TeacherHistory() {
                           : <span className="badge badge-red">🔓 Unlock</span>}
                     </td>
                     <td style={{fontSize:13}}>
-                      {item.kind === 'purchase' ? item.packageName : `Unlocked: ${item.student?.name || 'Student'}`}
+                      {item.kind === 'purchase' ? item.packageName : `Unlocked: ${item.lead?.requirementType || 'Lead'} — ${item.lead?.city || ''}`}
                     </td>
                     <td style={{fontWeight:800, color: item.kind==='purchase' ? 'var(--green)' : 'var(--red)'}}>
                       {item.kind === 'purchase' ? `+${item.coinsAdded}` : item.isFree ? '0 (Free)' : `-${item.coinsSpent}`}
@@ -91,6 +93,7 @@ export default function TeacherHistory() {
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       </main>
     </div>

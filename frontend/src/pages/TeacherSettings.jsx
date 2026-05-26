@@ -3,16 +3,16 @@ import Sidebar from '../components/Sidebar';
 import './StudentDashboard.css';
 
 const NAV = [
-  { type:'section', label:'Main' },
-  { icon:'📊', label:'Overview',          path:'/teacher/dashboard' },
-  { icon:'🔍', label:'Browse Students',   path:'/teacher/students'  },
-  { icon:'🔓', label:'Unlocked Profiles', path:'/teacher/unlocked'  },
-  { icon:'👤', label:'My Profile',        path:'/teacher/profile'   },
-  { icon:'🪙', label:'Buy Coins',         path:'/teacher/coins'     },
-  { icon:'📋', label:'Coin History',      path:'/teacher/history'   },
+  { type:'section', label:'MAIN' },
+  { icon:'📊', label:'Dashboard',       path:'/teacher/dashboard' },
+  { icon:'🔍', label:'Browse Leads',    path:'/teacher/leads'     },
+  { icon:'🔓', label:'Unlocked Leads',  path:'/teacher/unlocked'  },
+  { icon:'👤', label:'My Profile',      path:'/teacher/profile'   },
+  { icon:'🪙', label:'Buy Coins',       path:'/teacher/coins'     },
+  { icon:'📋', label:'Coin History',    path:'/teacher/history'   },
   { type:'divider' },
-  { type:'section', label:'Settings' },
-  { icon:'⚙️', label:'Settings',          path:'/teacher/settings'  },
+  { type:'section', label:'SETTINGS' },
+  { icon:'⚙️', label:'Settings',        path:'/teacher/settings'  },
   { icon:'🚪', label:'Log Out', logout:true },
 ];
 
@@ -20,9 +20,10 @@ export default function TeacherSettings() {
   const { user, toast } = useApp();
   const name = user?.teacher?.name || user?.email || 'Teacher';
   return (
-    <div className="page-enter" style={{ paddingTop:66 }}>
-      <Sidebar items={NAV} userName={name} userRole="Teacher Account" avClass="av-gold" initials={name[0]} />
+    <div className="page-enter dash-layout">
+      <Sidebar nav={NAV} user={user} />
       <main className="dash-main">
+        <div className="dash-inner" style={{ maxWidth:900 }}>
         <h1 className="page-title">Settings</h1>
         <p className="page-sub">Manage your teacher account preferences</p>
         <div className="grid-2" style={{ maxWidth:800 }}>
@@ -50,6 +51,7 @@ export default function TeacherSettings() {
               <button className="btn btn-md btn-primary btn-w-full" onClick={() => toast('Settings saved ✅','s')}>Save Settings</button>
             </div>
           </div>
+        </div>
         </div>
       </main>
     </div>

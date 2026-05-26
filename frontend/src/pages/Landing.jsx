@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useEffect, useRef } from 'react';
 import './Landing.css';
 
@@ -28,11 +29,11 @@ export default function Landing() {
         </div>
         <div className="hero-inner">
           <div className="hero-left">
-            <div className="hero-eyebrow">✦ India's #1 Home Tuition Platform</div>
+            <div className="hero-eyebrow">✦ Online Coaching · Spoken English · Assignments & Projects</div>
             <h1 className="hero-h1">Find the Best<br /><em>Teachers</em> Near You</h1>
-            <p className="hero-p">Connect students with qualified home tutors. Fast, simple, transparent — powered by a smart coin system.</p>
+            <p className="hero-p">Post your requirement free. Get matched with qualified teachers for online coaching, spoken English, school tuition, college subjects, software learning, assignments & more.</p>
             <div className="hero-btns">
-              <button className="btn btn-xl btn-primary" onClick={() => navigate('/register')}>I'm a Student →</button>
+              <button className="btn btn-xl btn-primary" onClick={() => navigate('/register')}>Post Requirement Free →</button>
               <button className="btn btn-xl btn-ghost-dark" onClick={() => navigate('/register')}>I'm a Teacher</button>
             </div>
             <div className="hero-stats">
@@ -88,9 +89,9 @@ export default function Landing() {
         <div className="sec-head"><div className="sec-lbl">Transparent Pricing</div><h2 className="sec-h2">Simple Coin Packages</h2><p className="sec-p">Buy coins once, unlock student profiles as you go.</p></div>
         <div className="price-cards">
           {[
-            { emoji:'🪙', coins:100,  unlocks:2,  price:100, label:'Get Started',  featured:false },
-            { emoji:'💰', coins:200,  unlocks:4,  price:200, label:'Standard',     featured:false },
-            { emoji:'💎', coins:250,  unlocks:5,  price:250, label:'Best Value',   featured:true  },
+            { emoji:'🪙', coins:250,  unlocks:5,  price:250,  label:'Get Started', featured:false },
+            { emoji:'💰', coins:500,  unlocks:10, price:500,  label:'Standard',    featured:false },
+            { emoji:'💎', coins:1000, unlocks:20, price:1000, label:'Best Value',  featured:true  },
           ].map((pkg,i) => (
             <div className={`price-card ${pkg.featured ? 'featured' : ''}`} key={i}>
               {pkg.featured && <div className="price-card-pop">MOST POPULAR</div>}
@@ -143,9 +144,9 @@ export default function Landing() {
       <footer className="footer">
         <div className="footer-top">
           <div><div className="footer-brand">Teacher<span>Market</span></div><p className="footer-brand-p">India's trusted home tuition platform connecting students and teachers across 50+ cities.</p></div>
-          <div><div className="footer-col-title">Platform</div><ul className="footer-links"><li><a href="#">How It Works</a></li><li><a href="#">For Students</a></li><li><a href="#">For Teachers</a></li><li><a href="#">Pricing</a></li></ul></div>
-          <div><div className="footer-col-title">Support</div><ul className="footer-links"><li><a href="#">Help Center</a></li><li><a href="#">Contact</a></li><li><a href="#">Privacy Policy</a></li><li><a href="#">Terms</a></li></ul></div>
-          <div><div className="footer-col-title">Cities</div><ul className="footer-links"><li><a href="#">Bhopal</a></li><li><a href="#">Indore</a></li><li><a href="#">Jabalpur</a></li><li><a href="#">Delhi</a></li></ul></div>
+          <div><div className="footer-col-title">Platform</div><ul className="footer-links"><li><Link to="/register">I'm a Student</Link></li><li><Link to="/register">I'm a Teacher</Link></li><li><Link to="/faq">FAQ</Link></li><li><Link to="/contact">Contact</Link></li></ul></div>
+          <div><div className="footer-col-title">Support</div><ul className="footer-links"><li><Link to="/contact">Contact Us</Link></li><li><Link to="/privacy">Privacy Policy</Link></li><li><Link to="/terms">Terms & Conditions</Link></li><li><Link to="/faq">FAQ</Link></li></ul></div>
+          <div><div className="footer-col-title">Cities</div><ul className="footer-links"><li><button type="button">Bhopal</button></li><li><button type="button">Indore</button></li><li><button type="button">Jabalpur</button></li><li><button type="button">Delhi</button></li></ul></div>
         </div>
         <div className="footer-bottom">
           <div className="footer-copy">© 2026 TeacherMarket. All rights reserved.</div>

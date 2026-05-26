@@ -2,78 +2,92 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Sidebar from '../components/Sidebar';
+import { PageSkeleton } from '../components/Skeleton';
 import { teacherApi } from '../services/api';
-import './StudentDashboard.css';
 
 const NAV = [
-  { type:'section', label:'Main' },
-  { icon:'📊', label:'Overview',          path:'/teacher/dashboard'  },
-  { icon:'🔍', label:'Browse Students',   path:'/teacher/students',  badge:'●' },
-  { icon:'🔓', label:'Unlocked Profiles', path:'/teacher/unlocked'   },
-  { icon:'👤', label:'My Profile',        path:'/teacher/profile'    },
-  { icon:'🪙', label:'Buy Coins',         path:'/teacher/coins'      },
-  { icon:'📋', label:'Coin History',      path:'/teacher/history'    },
+  { type:'section', label:'MAIN' },
+  { icon:'📊', label:'Dashboard',       path:'/teacher/dashboard' },
+  { icon:'🔍', label:'Browse Leads',    path:'/teacher/leads'     },
+  { icon:'🔓', label:'Unlocked Leads',  path:'/teacher/unlocked'  },
+  { icon:'👤', label:'My Profile',      path:'/teacher/profile'   },
+  { icon:'🪙', label:'Buy Coins',       path:'/teacher/coins'     },
+  { icon:'📋', label:'Coin History',    path:'/teacher/history'   },
   { type:'divider' },
-  { type:'section', label:'Settings' },
-  { icon:'⚙️', label:'Settings',          path:'/teacher/settings'   },
+  { type:'section', label:'SETTINGS' },
+  { icon:'⚙️', label:'Settings',        path:'/teacher/settings'  },
   { icon:'🚪', label:'Log Out', logout:true },
 ];
 
 export default function TeacherDashboard() {
   const { user, coins } = useApp();
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ coinBalance:0, freeViews:2, unlockedStudents:0, studentsInCity:0 });
+  const [stats, setStats] = useState({ coinBalance:0, freeViews:2, unlockedLeads:0, totalPublished:0 });
   const [loading, setLoading] = useState(true);
 
-  const name = user?.teacher?.name || user?.email || 'Teacher';
-
   useEffect(() => {
-    teacherApi.getStats()
-      .then(d => setStats(d))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    setLoading(true);
+    teacherApi.getStats().then(setStats).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
+  const name = user?.teacher?.name || user?.email?.split('@')[0] || 'Teacher';
+
   return (
-    <div className="page-enter" style={{ paddingTop:66 }}>
-      <Sidebar items={NAV} userName={name} userRole="Teacher Account" avClass="av-gold" initials={name[0]} />
+    <div className="page-enter dash-layout">
+      <Sidebar nav={NAV} user={user} />
       <main className="dash-main">
-        <div className="coin-hero">
-          <div className="ch-left">
-            <div className="ch-label">🪙 Coin Balance</div>
-            <div className="ch-amount">{coins}</div>
-            <div className="ch-sub">Unlock {Math.floor(coins/50)} more profiles · {stats.freeViews} free view{stats.freeViews !== 1 ? 's' : ''} remaining</div>
-          </div>
-          <div className="ch-right">
-            <button className="btn btn-md btn-primary" onClick={() => navigate('/teacher/coins')}>+ Buy Coins</button>
-            <button className="btn btn-md btn-ghost-dark" onClick={() => navigate('/teacher/students')}>Browse Students →</button>
-          </div>
-        </div>
-
-        <div className="grid-4" style={{ marginBottom:24 }}>
-          <div className="stat-c c-gold"><div style={{fontSize:22}}>🪙</div><div className="stat-num">{coins}</div><div className="stat-label">Coin Balance</div></div>
-          <div className="stat-c c-navy"><div style={{fontSize:22}}>🔓</div><div className="stat-num">{loading ? '…' : stats.unlockedStudents}</div><div className="stat-label">Profiles Unlocked</div></div>
-        </div>
-
-        <div className="grid-2" style={{ gap:20 }}>
-          <div className="card">
-            <div className="card-header"><div className="card-title">Quick Actions</div></div>
-            <div className="card-body" style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              <button className="btn btn-md btn-navy btn-w-full" onClick={() => navigate('/teacher/students')}>🔍 Browse Students in Your City</button>
-              <button className="btn btn-md btn-primary btn-w-full" onClick={() => navigate('/teacher/unlocked')}>🔓 View Unlocked Profiles</button>
+        <div className="dash-inner">
+          {loading ? (
+            <PageSkeleton />
+          ) : (
+          <>
+          <div className="coin-hero">
+            <div className="ch-left">
+              <div className="ch-label">🪙 Coin Balance</div>
+              <div className="ch-amount">{coins}</div>
+              <div className="ch-sub">{stats.freeViews} free unlock{stats.freeViews!==1?'s':''} remaining · 50 coins = 1 unlock</div>
+            </div>
+            <div className="ch-right">
+              <button className="btn btn-md btn-primary" onClick={() => navigate('/teacher/coins')}>+ Buy Coins</button>
+              <button className="btn btn-md" style={{ background:'rgba(255,255,255,.15)', color:'#fff', border:'1px solid rgba(255,255,255,.25)' }} onClick={() => navigate('/teacher/leads')}>Browse Leads →</button>
             </div>
           </div>
-          <div className="card">
-            <div className="card-header"><div className="card-title">City Overview</div></div>
-            <div className="card-body">
-              <div style={{ textAlign:'center', padding:'16px 0' }}>
-                <div style={{ fontSize:48, marginBottom:8 }}>🏙️</div>
-                <div style={{ fontFamily:'Sora,sans-serif', fontWeight:900, fontSize:36, color:'var(--navy)' }}>{loading ? '…' : stats.studentsInCity}</div>
-                <div style={{ fontSize:14, color:'var(--gray)', marginTop:4 }}>Students in {user?.teacher?.city || 'your city'}</div>
-                <button className="btn btn-md btn-primary" style={{ marginTop:16 }} onClick={() => navigate('/teacher/students')}>Browse All →</button>
+
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:14, margin:'20px 0' }}>
+            {[
+              { icon:'🪙', label:'Coin Balance',     val: coins,                   c:'#fff8ec', ic:'#92400e' },
+              { icon:'🔓', label:'Leads Unlocked',   val: stats.unlockedLeads,     c:'#d1fae5', ic:'#065f46' },
+              { icon:'🌐', label:'Published Leads',  val: stats.totalPublished,    c:'#eff6ff', ic:'#1e40af' },
+              { icon:'🎁', label:'Free Views Left',  val: stats.freeViews,         c:'#f5f3ff', ic:'#5b21b6' },
+            ].map(k => (
+              <div key={k.label} style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:12, padding:'16px 14px', display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ width:40, height:40, borderRadius:10, background:k.c, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>{k.icon}</div>
+                <div><div style={{ fontSize:22, fontWeight:900, color:k.ic, fontFamily:'Sora,sans-serif' }}>{k.val}</div><div style={{ fontSize:11, color:'var(--gray)', fontWeight:600 }}>{k.label}</div></div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
+            <div style={{ background:'#fff', borderRadius:14, border:'1px solid var(--border)', padding:22 }}>
+              <div style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:15, color:'var(--navy)', marginBottom:14 }}>Quick Actions</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                <button className="btn btn-md btn-primary" style={{ justifyContent:'center' }} onClick={() => navigate('/teacher/leads')}>🔍 Browse Student Leads</button>
+                <button className="btn btn-md btn-navy" style={{ justifyContent:'center', background:'var(--navy)', color:'#fff' }} onClick={() => navigate('/teacher/unlocked')}>🔓 View Unlocked Leads</button>
+                <button className="btn btn-md" style={{ justifyContent:'center', background:'var(--gray-ll)', color:'var(--navy)' }} onClick={() => navigate('/teacher/coins')}>🪙 Buy More Coins</button>
+              </div>
+            </div>
+            <div style={{ background:'#fff', borderRadius:14, border:'1px solid var(--border)', padding:22 }}>
+              <div style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:15, color:'var(--navy)', marginBottom:14 }}>Coin System</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:10, fontSize:13, color:'var(--gray)', lineHeight:1.7 }}>
+                <div>🎁 <strong style={{ color:'var(--navy)' }}>First 2 unlocks FREE</strong> for every new teacher</div>
+                <div>🪙 <strong style={{ color:'var(--navy)' }}>50 coins = 1 unlock</strong> — reveals student contact</div>
+                <div>💰 <strong style={{ color:'var(--navy)' }}>₹1 = 1 coin</strong> — transparent pricing</div>
+                <div>🔒 <strong style={{ color:'var(--navy)' }}>Pay only for what you need</strong> — no subscriptions</div>
               </div>
             </div>
           </div>
+          </>
+          )}
         </div>
       </main>
     </div>

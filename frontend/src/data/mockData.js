@@ -10,9 +10,9 @@ export const studentsDB = [
 ];
 
 export const coinPackages = [
-  { id: 'starter', name: 'Starter Pack', emoji: '🪙', coins: 100, price: 100, unlocks: 2 },
+  { id: 'starter',  name: 'Starter Pack',  emoji: '🪙', coins: 100, price: 100, unlocks: 2 },
   { id: 'standard', name: 'Standard Pack', emoji: '💰', coins: 200, price: 200, unlocks: 4 },
-  { id: 'popular', name: 'Popular Pack', emoji: '💎', coins: 250, price: 250, unlocks: 5, popular: true },
+  { id: 'popular',  name: 'Popular Pack',  emoji: '💎', coins: 250, price: 250, unlocks: 5, popular: true },
 ];
 
 export const activityFeed = [

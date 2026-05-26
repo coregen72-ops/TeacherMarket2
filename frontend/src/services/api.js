@@ -1,5 +1,9 @@
 // ─── Base URL ─────────────────────────────────────────────────────────────────
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// In production (Render), frontend and backend are on the same domain,
+// so we use a relative URL (empty string). In development, we use localhost.
+const BASE_URL = (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.trim())
+  ? import.meta.env.VITE_API_URL.trim()
+  : (import.meta.env.DEV ? 'http://localhost:5000' : '');
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 const SESSION_KEY = 'tm_token';
@@ -23,20 +27,34 @@ const http = async (method, path, body = null, auth = false) => {
   if (body) options.body = JSON.stringify(body);
 
   const res  = await fetch(`${BASE_URL}${path}`, options);
-  const data = await res.json();
+  const raw  = await res.text();
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    throw new Error(
+      'API returned the website HTML instead of JSON. Set VITE_API_URL to the backend URL in production.'
+    );
+  }
 
-  if (!res.ok) throw new Error(data.error || 'Something went wrong');
+  if (!res.ok) throw new Error(data.error || data.message || 'Something went wrong');
   return data;
 };
 
 // ─── Decode Google JWT ────────────────────────────────────────────────────────
 function decodeGoogleCredential(credential) {
-  const payload    = credential?.split('.')[1];
+  const payload = credential?.split('.')[1];
   if (!payload) throw new Error('Google credential missing');
   const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
-  const padded     = normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '=');
-  const json       = atob(padded);
-  return JSON.parse(decodeURIComponent([...json].map(c => `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`).join('')));
+  const padded     = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4), '='
+  );
+  const json = atob(padded);
+  return JSON.parse(
+    decodeURIComponent(
+      [...json].map(c => `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`).join('')
+    )
+  );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -49,7 +67,7 @@ export const authApi = {
     return http('POST', '/auth/send-otp', { email });
   },
 
-  // Verify OTP (registration) — always returns isNewUser: true for registration flow
+  // Verify OTP (registration)
   async verifyEmailOtp(email, otp) {
     const data = await http('POST', '/auth/verify-otp', { email, otp });
     return {
@@ -58,22 +76,23 @@ export const authApi = {
       verifiedEmail: email.trim().toLowerCase(),
     };
   },
+
   // Admin login — no OTP needed
-async adminLogin({ email, password }) {
-  const data = await http('POST', '/auth/admin-login', {
-    email: email.trim().toLowerCase(),
-    password,
-  });
-  if (data.token) token.save(data.token);
-  return data;
-},
+  async adminLogin({ email, password }) {
+    const data = await http('POST', '/auth/admin-login', {
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    if (data.token) token.save(data.token);
+    return data;
+  },
 
   // Register new user
   async register(body) {
     const payload = {
-      email: body.email,
-      phone: body.phone || '',
-      role:  body.role.toUpperCase(),
+      email:    body.email,
+      phone:    body.phone || '',
+      role:     body.role.toUpperCase(),
       googleId: body.googleId || undefined,
     };
 
@@ -94,7 +113,7 @@ async adminLogin({ email, password }) {
           contactNumber: d.contactNumber || body.phone || '',
         }, true);
       } catch (e) {
-        console.warn('Profile create failed:', e.message);
+        console.warn('Student profile create failed:', e.message);
       }
     }
 
@@ -111,7 +130,7 @@ async adminLogin({ email, password }) {
           pincode:       d.pincode || '',
         }, true);
       } catch (e) {
-        console.warn('Profile create failed:', e.message);
+        console.warn('Teacher profile create failed:', e.message);
       }
     }
 
@@ -120,37 +139,9 @@ async adminLogin({ email, password }) {
 
   // Google Auth
   async googleAuth(credential, role) {
-    const profile = decodeGoogleCredential(credential);
-    const email   = profile.email.trim().toLowerCase();
-
-    // Check if user exists by trying to send login OTP
-    try {
-      await http('POST', '/auth/login', { email });
-      // User exists — send OTP for login
-      return {
-        message:   'OTP sent to your email',
-        isNewUser: false,
-        email,
-        googleProfile: {
-          email,
-          name:    profile.name || '',
-          picture: profile.picture || '',
-          googleId: profile.sub,
-        },
-      };
-    } catch (err) {
-      // User doesn't exist — new user
-      return {
-        message:   'Google verified. Complete registration.',
-        isNewUser: true,
-        googleProfile: {
-          email,
-          name:    profile.name || '',
-          picture: profile.picture || '',
-          googleId: profile.sub,
-        },
-      };
-    }
+    const data = await http('POST', '/auth/google', { credential, role });
+    if (data.token) token.save(data.token);
+    return data;
   },
 
   // Login Step 1 — Send OTP
@@ -165,7 +156,7 @@ async adminLogin({ email, password }) {
     return data;
   },
 
-  // Get current logged in user
+  // Get current logged-in user
   async me() {
     const data = await http('GET', '/auth/me', null, true);
     return { user: data };
@@ -191,10 +182,10 @@ export const profileApi = {
     const me = await authApi.me();
 
     if (me.user?.role === 'STUDENT' || me.role === 'STUDENT') {
-      const d = body.studentDetails || body;
+      const d       = body.studentDetails || body;
       const updated = await http('PUT', '/student/profile', {
-        name:          d.name || body.name,
-        class:         d.class || d.cls,
+        name:          d.name          || body.name,
+        class:         d.class         || d.cls,
         board:         d.board,
         subjects:      Array.isArray(d.subjects) ? d.subjects.join(',') : d.subjects,
         address:       d.address,
@@ -211,13 +202,13 @@ export const profileApi = {
     }
 
     if (me.user?.role === 'TEACHER' || me.role === 'TEACHER') {
-      const d = body.teacherDetails || body;
+      const d       = body.teacherDetails || body;
       const updated = await http('PUT', '/teacher/profile', {
-        name:          d.name || body.name,
+        name:          d.name          || body.name,
         qualification: d.qualification,
         experience:    d.experience,
         subjects:      Array.isArray(d.subjects) ? d.subjects.join(',') : d.subjects,
-        location:      d.location || d.area || d.city,
+        location:      d.location      || d.area || d.city,
         city:          d.city,
         pincode:       d.pincode,
         monthlyFee:    d.monthlyFee,
@@ -227,7 +218,7 @@ export const profileApi = {
   },
 
   async createTeacher(d) {
-    const me = await authApi.me();
+    const me      = await authApi.me();
     const created = await http('POST', '/teacher/profile', {
       name:          d.name,
       qualification: d.qualification,
@@ -242,7 +233,7 @@ export const profileApi = {
   },
 
   async updateTeacher(d) {
-    const me = await authApi.me();
+    const me      = await authApi.me();
     const updated = await http('PUT', '/teacher/profile', {
       name:          d.name,
       qualification: d.qualification,
@@ -261,20 +252,75 @@ export const profileApi = {
     return {
       ...data,
       subjects: typeof data.subjects === 'string'
-        ? data.subjects.split(',').map(sub => sub.trim()).filter(Boolean)
+        ? data.subjects.split(',').map(s => s.trim()).filter(Boolean)
         : data.subjects || [],
     };
   },
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  STUDENTS API (for teachers)
+//  LEADS API
+// ══════════════════════════════════════════════════════════════════════════════
+export const leadsApi = {
+
+  // Student — submit a new lead/requirement
+  async submit(body) {
+    return http('POST', '/student/leads', body);
+  },
+
+  async post(body) {
+    return this.submit(body);
+  },
+
+  // Student — get own leads
+  async getMyLeads(email = '') {
+    const query = email ? `?email=${encodeURIComponent(email)}` : '';
+    return http('GET', `/student/leads${query}`, null, true);
+  },
+
+  async mine(email = '') {
+    return this.getMyLeads(email);
+  },
+
+  // Teacher — browse published leads
+  async browse(params = {}) {
+    const query = new URLSearchParams();
+    if (params.type    && params.type    !== 'ALL') query.set('type',    params.type);
+    if (params.subject && params.subject !== '')    query.set('subject', params.subject);
+    if (params.city    && params.city    !== '')    query.set('city',    params.city);
+    const qs = query.toString();
+    const data = await http('GET', `/teacher/leads${qs ? `?${qs}` : ''}`, null, true);
+    const leads = data.leads || data.students || [];
+    return {
+      ...data,
+      leads,
+      total: data.total ?? leads.length,
+    };
+  },
+
+  async published(params = {}) {
+    return this.browse(params);
+  },
+
+  // Teacher — unlock a lead
+  async unlock(leadId) {
+    return http('POST', `/teacher/leads/${leadId}/unlock`, null, true);
+  },
+
+  // Teacher — get all unlocked leads
+  async getUnlocked() {
+    return http('GET', '/teacher/leads/unlocked', null, true);
+  },
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  STUDENTS API (for teachers — legacy profile unlock)
 // ══════════════════════════════════════════════════════════════════════════════
 export const studentsApi = {
 
   async browse(params = {}) {
-    const data = await http('GET', '/teacher/students', null, true);
-    let students = data.students || [];
+    const data     = await http('GET', '/teacher/students', null, true);
+    let students   = data.students || [];
 
     if (params.subject) {
       students = students.filter(s =>
@@ -303,17 +349,9 @@ export const studentsApi = {
     return http('GET', '/teacher/unlocked', null, true);
   },
 
-  async sendRequest(id, message = '') {
-    return { message: 'Contact request sent' };
-  },
-
-  async myRequests() {
-    return { requests: [], total: 0 };
-  },
-
-  async respond(id, status) {
-    return { message: `Request ${status}` };
-  },
+  async sendRequest()  { return { message: 'Contact request sent' }; },
+  async myRequests()   { return { requests: [], total: 0 }; },
+  async respond(id, status) { return { message: `Request ${status}` }; },
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -322,12 +360,18 @@ export const studentsApi = {
 export const teacherApi = {
 
   async getStats() {
-    const coinsData    = await http('GET', '/teacher/coins', null, true);
-    const unlockedData = await http('GET', '/teacher/unlocked', null, true);
-
+    const [coinsData, unlockedData, leadsData] = await Promise.all([
+      http('GET', '/teacher/coins',    null, true),
+      http('GET', '/teacher/unlocked', null, true),
+      http('GET', '/teacher/leads',    null, true).catch(() => ({ leads: [], total: 0 })),
+    ]);
+    const publishedLeads = leadsData.total ?? (leadsData.leads || []).length;
     return {
       coinBalance:      coinsData.coinBalance,
       freeViews:        coinsData.freeViews,
+      coinsToUnlock:    coinsData.coinsToUnlock,
+      unlockedLeads:    unlockedData.total || (unlockedData.students || []).length || 0,
+      totalPublished:   publishedLeads,
       unlockedStudents: unlockedData.total || 0,
       sentRequests:     0,
       acceptedRequests: 0,
@@ -361,9 +405,9 @@ export const paymentApi = {
 
   async createOrder(body) {
     const packages = {
-      starter: { name: 'Starter Pack', coins: 100, priceINR: 100 },
-      standard: { name: 'Standard Pack', coins: 200, priceINR: 200 },
-      popular: { name: 'Popular Pack', coins: 250, priceINR: 250 },
+      starter:  { name: 'Starter Pack',  coins: 250,  priceINR: 250 },
+      standard: { name: 'Standard Pack', coins: 500,  priceINR: 500 },
+      popular:  { name: 'Popular Pack',  coins: 1000, priceINR: 1000 },
     };
 
     const customAmount = Number(body.customAmount || 0);
@@ -374,7 +418,7 @@ export const paymentApi = {
     if (!pkg) throw new Error('Invalid package.');
 
     const data = await http('POST', '/payment/create-order', {
-      amount: pkg.priceINR
+      amount: pkg.priceINR,
     }, true);
 
     return {
@@ -384,23 +428,27 @@ export const paymentApi = {
       keyId:       data.keyId,
       packageName: pkg.name,
       coins:       pkg.coins,
+      devMode:     data.devMode || false,
     };
   },
 
   async verifyPayment(body) {
-    const amount = Number(body.amount ?? (body.amountPaise ? body.amountPaise / 100 : 0));
+    const amount = Number(
+      body.amount ?? (body.amountPaise ? body.amountPaise / 100 : 0)
+    );
     return http('POST', '/payment/verify', {
-      razorpay_order_id:   body.razorpay_order_id || body.razorpayOrderId || body.orderId,
+      razorpay_order_id:   body.razorpay_order_id   || body.razorpayOrderId   || body.orderId,
       razorpay_payment_id: body.razorpay_payment_id || body.razorpayPaymentId || body.paymentId,
-      razorpay_signature:  body.razorpay_signature || body.razorpaySignature || body.signature,
+      razorpay_signature:  body.razorpay_signature  || body.razorpaySignature || body.signature,
       amount,
     }, true);
   },
 
   async getHistory() {
-    const coinsData    = await http('GET', '/teacher/coins', null, true);
-    const unlockedData = await http('GET', '/teacher/unlocked', null, true);
-
+    const [coinsData, unlockedData] = await Promise.all([
+      http('GET', '/teacher/coins',    null, true),
+      http('GET', '/teacher/unlocked', null, true),
+    ]);
     return {
       payments:    [],
       unlocks:     unlockedData.students || [],
@@ -409,23 +457,101 @@ export const paymentApi = {
   },
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  ADMIN API
+// ══════════════════════════════════════════════════════════════════════════════
 export const adminApi = {
+
   async getStats() {
-    return http("GET", "/admin/stats", null, true);
+    return http('GET', '/admin/stats', null, true);
   },
-  async getUsers() {
-    return http("GET", "/admin/users", null, true);
+
+  // Leads
+  async getLeads(params = {}) {
+    const query = new URLSearchParams();
+    if (params.page)   query.set('page',   params.page);
+    if (params.limit)  query.set('limit',  params.limit);
+    if (params.status) query.set('status', params.status);
+    if (params.type)   query.set('type',   params.type);
+    const qs = query.toString();
+    return http('GET', `/admin/leads${qs ? `?${qs}` : ''}`, null, true);
   },
-  async getTeachers() {
-    return http("GET", "/admin/teachers", null, true);
+
+  async updateLead(id, data) {
+    return http('PATCH', `/admin/leads/${id}`, data, true);
   },
-  async getStudents() {
-    return http("GET", "/admin/students", null, true);
+
+  async deleteLead(id) {
+    return http('DELETE', `/admin/leads/${id}`, null, true);
   },
-  async getPayments() {
-    return http("GET", "/admin/payments", null, true);
+
+  // Members
+  async getMembers(params = {}) {
+    const query = new URLSearchParams();
+    if (params.page)   query.set('page',   params.page);
+    if (params.limit)  query.set('limit',  params.limit);
+    if (params.role)   query.set('role',   params.role);
+    if (params.search) query.set('search', params.search);
+    if (params.status) query.set('status', params.status);
+    const qs = query.toString();
+    return http('GET', `/admin/members${qs ? `?${qs}` : ''}`, null, true);
   },
-  async deleteUser(id) {
-    return http("DELETE", `/admin/users/${id}`, null, true);
+
+  async suspendMember(id, isSuspended) {
+    return http('PATCH', `/admin/members/${id}/suspend`, { isSuspended }, true);
+  },
+
+  async adjustCoins(id, delta) {
+    return http('PATCH', `/admin/members/${id}/coins`, { delta }, true);
+  },
+
+  // Transactions
+  async getTransactions(params = {}) {
+    const query = new URLSearchParams();
+    if (params.page)   query.set('page',   params.page);
+    if (params.limit)  query.set('limit',  params.limit);
+    if (params.status) query.set('status', params.status);
+    const qs = query.toString();
+    return http('GET', `/admin/transactions${qs ? `?${qs}` : ''}`, null, true);
+  },
+
+  // Packages
+  async getPackages() {
+    return http('GET', '/admin/packages', null, true);
+  },
+
+  async savePackage(data) {
+    return http('POST', '/admin/packages', data, true);
+  },
+
+  async deletePackage(id) {
+    return http('DELETE', `/admin/packages/${id}`, null, true);
+  },
+
+  // FAQs
+  async getFaqs() {
+    return http('GET', '/admin/faqs', null, true);
+  },
+
+  async createFaq(data) {
+    return http('POST', '/admin/faqs', data, true);
+  },
+
+  async updateFaq(id, data) {
+    return http('PATCH', `/admin/faqs/${id}`, data, true);
+  },
+
+  async deleteFaq(id) {
+    return http('DELETE', `/admin/faqs/${id}`, null, true);
+  },
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  PUBLIC API
+// ══════════════════════════════════════════════════════════════════════════════
+export const publicApi = {
+
+  async getFaqs() {
+    return http('GET', '/faqs');
   },
 };

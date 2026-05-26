@@ -1,52 +1,78 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { authApi } from '../services/api';
+import { seedAdmin } from '../services/db';
 import { renderGoogleButton } from '../services/googleAuth';
 import './Auth.css';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { loginWithData, toast } = useApp();
-  const [step,    setStep]    = useState('input');
-  const [email,   setEmail]   = useState('');
+  const [step, setStep] = useState('input');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [otp,     setOtp]     = useState('');
+  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [lastOtp, setLastOtp] = useState('');
   const googleButtonRef = useRef(null);
 
+  useEffect(() => {
+    if (location.state?.email) setEmail(location.state.email);
+  }, [location.state]);
+
+  const redirect = (role) => {
+    if (role === 'ADMIN') navigate('/admin/dashboard');
+    else if (role === 'TEACHER') navigate('/teacher/dashboard');
+    else navigate('/student/dashboard');
+  };
+
+  // ── Google credential handler ─────────────────────────────────────────────
   const handleGoogleCredential = async (response) => {
     setLoading(true);
     try {
       const data = await authApi.googleAuth(response.credential);
+
       if (data.isNewUser) {
+        // Brand new user — send them to Register with profile pre-filled
         localStorage.setItem('tm_pending_google', JSON.stringify(data.googleProfile));
-        toast('Google verified. Complete your profile.', 's');
+        toast('Google verified ✅ — Complete your profile to finish signing up.', 's');
         navigate('/register');
         return;
       }
+
+      // Existing user — log them straight in
       loginWithData(data.user);
       toast('Signed in with Google ✅', 's');
       redirect(data.user.role);
-    } catch (err) { toast(err.message, 'e'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      // If backend says "not registered" and they used Google, send to register
+      const msg = err.message || '';
+      if (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('register')) {
+        toast('No account found. Redirecting to register…', 'i');
+        setTimeout(() => navigate('/register'), 1200);
+      } else {
+        toast(msg || 'Google sign-in failed. Please try again.', 'e');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Render Google button whenever we're on the "input" step
   useEffect(() => {
-    if (step !== 'input') return;
+    if (step !== 'input' || isAdmin) return;
     let cancelled = false;
-    renderGoogleButton(googleButtonRef.current, (r) => { if (!cancelled) handleGoogleCredential(r); }).catch(() => {});
+    renderGoogleButton(googleButtonRef.current, (r) => {
+      if (!cancelled) handleGoogleCredential(r);
+    }).catch(() => { });
     return () => { cancelled = true; };
-  }, [step]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, isAdmin]);
 
-  const redirect = (role) => {
-    if (role === 'ADMIN')        navigate('/admin/dashboard');
-    else if (role === 'TEACHER') navigate('/teacher/dashboard');
-    else                          navigate('/student/dashboard');
-  };
-
+  // ── OTP Login ─────────────────────────────────────────────────────────────
   const sendOtp = async () => {
     if (!email.trim()) { toast('Enter your email address', 'e'); return; }
     setLoading(true);
@@ -62,14 +88,26 @@ export default function Login() {
       const data = await authApi.sendLoginOtp(email.trim());
       if (data.devMode && data.otp) {
         setLastOtp(data.otp);
-        toast(`📧 Dev Mode OTP: ${data.otp}`, 'i');
         setOtp(data.otp);
+        toast(`📧 Dev Mode OTP: ${data.otp}`, 'i');
       } else {
         toast('OTP sent to your email ✅', 's');
       }
       setStep('otp');
-    } catch (err) { toast(err.message, 'e'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      const msg = err.message || '';
+      // Never redirect admin to register — always show the actual error
+      if (isAdmin) {
+        toast(msg || 'Admin login failed. Check email/password and ensure the server is running.', 'e');
+      } else if (msg.toLowerCase().includes('register') || msg.toLowerCase().includes('not found')) {
+        toast('No account with this email. Redirecting to register…', 'i');
+        setTimeout(() => navigate('/register', { state: { email: email.trim() } }), 1500);
+      } else {
+        toast(msg, 'e');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const verifyOtp = async () => {
@@ -84,29 +122,13 @@ export default function Login() {
     finally { setLoading(false); }
   };
 
-  // ── Admin login — calls backend directly, no OTP ──
   const handleAdminClick = async () => {
+    seedAdmin();
     setIsAdmin(true);
-    setEmail('admin@tutormatch.in');
+    setEmail(import.meta.env.VITE_ADMIN_EMAIL || 'Jain206542@gmail.com');
     setPassword('');
     setStep('input');
     setOtp('');
-    return;
-    setLoading(true);
-    try {
-      const data = await authApi.adminLogin();
-      loginWithData(data.user);
-      toast('Admin signed in ✅', 's');
-      navigate('/admin/dashboard');
-    } catch (err) {
-      toast(err.message, 'e');
-      setIsAdmin(true);
-      setEmail('admin@tutormatch.in');
-      setStep('input');
-      setOtp('');
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
@@ -115,20 +137,18 @@ export default function Login() {
         <div className="auth-left-orb auth-left-orb-1" />
         <div className="auth-left-orb auth-left-orb-2" />
         <div className="auth-left-content">
-          <div style={{ fontSize:52, marginBottom:24 }}>TM</div>
+          <div style={{ fontSize: 52, marginBottom: 24 }}>TM</div>
           <h2 className="auth-left-title">Welcome Back!</h2>
-          <p className="auth-left-sub">Log in with your registered email. No password needed.</p>
+          <p className="auth-left-sub">Log in with Google or your registered email (OTP).</p>
           <div className="auth-stats-box">
             <div><div className="auth-stat-num">12K+</div><div className="auth-stat-lbl">Students</div></div>
             <div><div className="auth-stat-num">4.8K+</div><div className="auth-stat-lbl">Tutors</div></div>
           </div>
-          {/* 🔐 Admin Login Button */}
-          <div style={{ marginTop:32 }}>
+          <div style={{ marginTop: 32 }}>
             <button
               className="btn btn-sm"
-              style={{ background:'rgba(255,255,255,.15)', color:'#fff', border:'1px solid rgba(255,255,255,.3)', borderRadius:8, fontSize:12, padding:'8px 16px' }}
+              style={{ background: 'rgba(255,255,255,.15)', color: '#fff', border: '1px solid rgba(255,255,255,.3)', borderRadius: 8, fontSize: 12, padding: '8px 16px' }}
               onClick={handleAdminClick}
-              disabled={loading}
             >
               🔐 Admin Login
             </button>
@@ -139,10 +159,10 @@ export default function Login() {
       <div className="auth-right">
         <div className="auth-form-wrap">
           {isAdmin && (
-            <div style={{ background:'#fff3cd', border:'1px solid #ffc107', borderRadius:10, padding:'10px 14px', marginBottom:18, fontSize:13, display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 10, padding: '10px 14px', marginBottom: 18, fontSize: 13, display: 'flex', alignItems: 'center', gap: 10 }}>
               <span>🔐</span>
-              <div><strong>Admin Login Mode</strong> — static admin account ready</div>
-              <button style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', color:'#666', fontSize:16 }} onClick={() => { setIsAdmin(false); setEmail(''); setStep('input'); setOtp(''); }}>✕</button>
+              <div><strong>Admin Login Mode</strong></div>
+              <button style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: 16 }} onClick={() => { setIsAdmin(false); setEmail(''); setPassword(''); setStep('input'); setOtp(''); }}>✕</button>
             </div>
           )}
 
@@ -151,6 +171,11 @@ export default function Login() {
             Don't have an account?{' '}
             <span className="auth-link" onClick={() => navigate('/register')}>Register here</span>
           </p>
+          {!isAdmin && (
+            <button className="auth-admin-mobile-btn" type="button" onClick={handleAdminClick}>
+              Admin Login
+            </button>
+          )}
 
           {step === 'input' ? (
             <>
@@ -190,19 +215,23 @@ export default function Login() {
               </button>
               {!isAdmin && (
                 <>
-                  <div className="auth-divider"><div className="auth-divider-line"/><span>or</span><div className="auth-divider-line"/></div>
+                  <div className="auth-divider"><div className="auth-divider-line" /><span>or</span><div className="auth-divider-line" /></div>
+                  {loading && <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--gray)', marginBottom: 8 }}>Signing in with Google…</p>}
                   <div ref={googleButtonRef} className="google-rendered-btn" />
+                  <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--gray)', marginTop: 10 }}>
+                    Google sign-in works for both login and registration
+                  </p>
                 </>
               )}
             </>
           ) : (
             <>
-              <div style={{ background:'var(--gold-p)', border:'1px solid rgba(245,166,35,.3)', borderRadius:12, padding:16, marginBottom:24 }}>
-                <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:'var(--navy)', marginBottom:4 }}>OTP sent to: {email}</div>
+              <div style={{ background: 'var(--gold-p)', border: '1px solid rgba(245,166,35,.3)', borderRadius: 12, padding: 16, marginBottom: 24 }}>
+                <div style={{ fontFamily: 'Sora,sans-serif', fontWeight: 700, fontSize: 14, color: 'var(--navy)', marginBottom: 4 }}>OTP sent to: {email}</div>
                 {lastOtp && (
-                  <div style={{ fontSize:13, color:'var(--gray)', marginTop:6, display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ fontSize: 13, color: 'var(--gray)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span>⚡ Dev mode — OTP auto-filled:</span>
-                    <strong style={{ color:'var(--gold)', fontSize:16, letterSpacing:2 }}>{lastOtp}</strong>
+                    <strong style={{ color: 'var(--gold)', fontSize: 16, letterSpacing: 2 }}>{lastOtp}</strong>
                   </div>
                 )}
               </div>
@@ -214,9 +243,9 @@ export default function Login() {
                   type="text"
                   maxLength={6}
                   placeholder="000000"
-                  style={{ textAlign:'center', fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:28, letterSpacing:10 }}
+                  style={{ textAlign: 'center', fontFamily: 'Sora,sans-serif', fontWeight: 800, fontSize: 28, letterSpacing: 10 }}
                   value={otp}
-                  onChange={e => setOtp(e.target.value.replace(/\D/g,'').slice(0,6))}
+                  onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   onKeyDown={e => e.key === 'Enter' && verifyOtp()}
                   autoFocus
                 />
@@ -229,7 +258,7 @@ export default function Login() {
               <button className="btn btn-lg btn-primary btn-w-full" onClick={verifyOtp} disabled={loading}>
                 {loading ? 'Verifying...' : 'Verify & Log In →'}
               </button>
-              <button className="btn btn-md btn-soft btn-w-full" style={{ marginTop:10 }} onClick={() => { setStep('input'); setOtp(''); setLastOtp(''); }}>
+              <button className="btn btn-md btn-soft btn-w-full" style={{ marginTop: 10 }} onClick={() => { setStep('input'); setOtp(''); setLastOtp(''); }}>
                 ← Change Email
               </button>
             </>

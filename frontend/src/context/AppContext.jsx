@@ -1,12 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { authApi, token as tokenStore } from '../services/api';
 
-const AppContext = createContext(null);
-export const useApp = () => {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useApp must be used inside AppProvider');
-  return ctx;
-};
+const Ctx = createContext(null);
+export const useApp = () => { const c = useContext(Ctx); if (!c) throw new Error('useApp outside AppProvider'); return c; };
 
 export function AppProvider({ children }) {
   const [user,        setUser]        = useState(null);
@@ -14,16 +10,15 @@ export function AppProvider({ children }) {
   const [toasts,      setToasts]      = useState([]);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Restore session on mount
   useEffect(() => {
     const restore = async () => {
-      const t = tokenStore.get();
-      if (!t) { setAuthLoading(false); return; }
+      if (!tokenStore.get()) { setAuthLoading(false); return; }
       try {
         const data = await authApi.me();
         setUser(data.user);
         setCoins(data.user?.teacher?.coinBalance || 0);
-      } catch {
+      } catch(e) {
+        console.error(e);
         tokenStore.remove();
       } finally {
         setAuthLoading(false);
@@ -32,46 +27,41 @@ export function AppProvider({ children }) {
     restore();
   }, []);
 
-  // Toast
   const toast = useCallback((msg, type = 's') => {
     const id = Date.now() + Math.random();
-    setToasts(prev => [...prev, { id, msg, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3800);
+    setToasts(p => [...p, { id, msg, type }]);
+    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), type === 'i' ? 8000 : 4500);
   }, []);
 
-  // After successful login / register
-  const loginWithData = useCallback((tok, userData) => {
-    tokenStore.save(tok);
+  const loginWithData = useCallback((userData, maybeToken) => {
+    if (maybeToken) tokenStore.save(maybeToken);
     setUser(userData);
     setCoins(userData?.teacher?.coinBalance || 0);
   }, []);
 
   const logout = useCallback(() => {
-    tokenStore.remove();
+    authApi.logout().catch(() => {});
     setUser(null);
     setCoins(0);
   }, []);
 
-  const updateUser = useCallback((updates) => {
-    setUser(prev => prev ? { ...prev, ...updates } : prev);
+  const refreshUser = useCallback(async () => {
+    if (!tokenStore.get()) return;
+    const data = await authApi.me();
+    setUser(data.user);
+    setCoins(data.user?.teacher?.coinBalance || 0);
   }, []);
 
-  const updateCoins = useCallback((newBal) => {
-    setCoins(newBal);
-    setUser(prev => {
-      if (!prev) return prev;
-      return { ...prev, teacher: prev.teacher ? { ...prev.teacher, coinBalance: newBal } : prev.teacher };
-    });
+  const updateUser   = useCallback((p) => setUser(prev => prev ? { ...prev, ...p } : prev), []);
+  const updateCoins  = useCallback((bal) => {
+    const b = typeof bal === 'number' ? bal : parseInt(bal) || 0;
+    setCoins(b);
+    setUser(prev => prev ? { ...prev, teacher: prev.teacher ? { ...prev.teacher, coinBalance: b } : prev.teacher } : prev);
   }, []);
 
   return (
-    <AppContext.Provider value={{
-      user, loginWithData, logout, updateUser,
-      coins, updateCoins,
-      authLoading,
-      toast, toasts,
-    }}>
+    <Ctx.Provider value={{ user, loginWithData, logout, updateUser, refreshUser, coins, updateCoins, authLoading, toast, toasts }}>
       {children}
-    </AppContext.Provider>
+    </Ctx.Provider>
   );
 }
